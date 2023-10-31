@@ -142,6 +142,86 @@ void BLE_rx_tx_fn()
     Serial.write(Serial1.read());       //블루투스측 내용을 시리얼모니터에 출력
   }
 
+  // Serial.println("bluetooth_string : " + bluetooth_string);       //시리얼모니터에 bluetooth_string 값 출력
+  if (bluetooth_string != "")         //bluetooth_string 값이 있다면
+  { 
+    // 실행(1~9)(전화버튼 기준):: ASCII
+
+    // 2 = "50"
+    if (bluetooth_string == "50")
+    {
+      Serial.println("전진");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_F_fn();
+      F_right_moter_F_fn();
+      B_left_moter_F_fn();
+      B_right_moter_F_fn();      
+    }
+
+    // 4 = "52"
+    else if (bluetooth_string == "52")
+    {
+      Serial.println("좌측이동");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_R_fn();
+      F_right_moter_F_fn();
+      B_left_moter_F_fn();
+      B_right_moter_R_fn();      
+    }
+
+    // 5 = "53"
+    else if (bluetooth_string == "53")
+    {
+      Serial.println("중지");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_stop_fn();
+      F_right_moter_stop_fn();
+      B_left_moter_stop_fn();      
+      B_right_moter_stop_fn();
+    }
+    
+    // 6 = "54"
+    else if (bluetooth_string == "54")
+    {
+      Serial.println("우측이동");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_F_fn();
+      F_right_moter_R_fn();
+      B_left_moter_R_fn();
+      B_right_moter_F_fn();      
+    }
+
+    // 8 = "56"
+    else if (bluetooth_string == "56")
+    {
+      Serial.println("후진");
+
+      // BUZZER ON/OFF 함수
+      button_state = 1;
+
+      F_left_moter_R_fn();
+      F_right_moter_R_fn();
+      B_left_moter_R_fn();
+      B_right_moter_R_fn();      
+    }
+
+    // BUZZER ON/OFF 함수
+    buzzer_fn(button_state);          
+
+  }  
+
 /*
 "No line ending [9600 baud]"
 AT  (OK)
@@ -206,6 +286,28 @@ void B_right_moter_R_fn()
 {
   digitalWrite(B_right_A_pin, LOW);
   digitalWrite(B_right_B_pin, HIGH);
+}
+
+// moter_stop_fn
+void F_left_moter_stop_fn()
+{
+  digitalWrite(F_left_A_pin, LOW);
+  digitalWrite(F_left_B_pin, LOW);
+}
+void F_right_moter_stop_fn()
+{
+  digitalWrite(F_right_A_pin, LOW);
+  digitalWrite(F_right_B_pin, LOW);
+}
+void B_left_moter_stop_fn()
+{
+  digitalWrite(B_left_A_pin, LOW);
+  digitalWrite(B_left_B_pin, LOW);
+}
+void B_right_moter_stop_fn()
+{
+  digitalWrite(B_right_A_pin, LOW);
+  digitalWrite(B_right_B_pin, LOW);
 }
 
 
