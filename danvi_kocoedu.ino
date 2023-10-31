@@ -5,6 +5,14 @@ PCB_ver
 */
 
 
+// Gyro
+// MPU6050_light
+#include "Wire.h"
+#include <MPU6050_light.h>
+
+MPU6050 mpu(Wire);
+unsigned long timer = 0;
+
 // 디지털핀 설계
 #define led_pin 13                    // 13번 디지털핀(led_pin)                 :: LED 출력
 #define buzzer_pin 6                  // 6번 디지털핀(buzzer_pin)               :: BUZZER 출력
@@ -35,6 +43,10 @@ String bluetooth_string = "";
 int line_sensor_L, line_sensor_R;
 int line_sensor_limit = 100;
 
+// Gyro
+int run_yaw_angle;
+int tarket_yaw_angle = 9999;
+
 
 //-----
 // 부팅시 만 실행
@@ -44,11 +56,25 @@ void setup()
   Serial.begin(9600);
 
   //블루투스시리얼[하드웨어] 초기화(9600)bps(bits per second)
-  Serial1.begin(9600);    
+  Serial1.begin(9600);  
+
+  // Gyro
+  Wire.begin();
+  
+  byte status = mpu.begin();
+  Serial.print(F("MPU6050 status: "));
+  Serial.println(status);
+  while(status!=0){ } // stop everything if could not connect to MPU6050
+  
+  Serial.println(F("Calculating offsets, do not move MPU6050"));
+  delay(1000);
+  // mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
+  mpu.calcOffsets(); // gyro and accelero
+  Serial.println("Done!\n");  
 
   // 디지털핀 초기화(OUTPUT)
   pinMode(led_pin, OUTPUT);                   // led_pin
-  pinMode(buzzer_pin, OUTPUT);                // buzzer_pin  
+  pinMode(buzzer_pin, OUTPUT);                // buzzer_pin
 
   pinMode(F_left_A_pin, OUTPUT);                // left_A_pin
   pinMode(F_left_B_pin, OUTPUT);                // left_B_pin
@@ -57,10 +83,10 @@ void setup()
   pinMode(B_left_A_pin, OUTPUT);                // left_A_pin
   pinMode(B_left_B_pin, OUTPUT);                // left_B_pin
   pinMode(B_right_A_pin, OUTPUT);               // right_A_pin
-  pinMode(B_right_B_pin, OUTPUT);               // right_B_pin    
+  pinMode(B_right_B_pin, OUTPUT);               // right_B_pin  
 
   // LED 모드선택(최초 부팅시)
-  blink_fn(button_state_cnt);       
+  blink_fn(button_state_cnt);          
 }
 // 부팅시 만 실행
 
@@ -69,6 +95,9 @@ void setup()
 // 메인(반복루프)
 void loop()
 {
+  // gyro_getAngle_fn
+  gyro_getAngle_fn();
+
   // 모드스위치(푸쉬스위치) 눌림 512이상 입력값 생성 :: 아날로그 입력값[0~1023]
   // 블루투스시리얼 0 => ASCII["48"]
   if ((analogRead(button_pin) > 512) || (bluetooth_string == "48"))
@@ -93,7 +122,7 @@ void loop()
     // 시리얼 프린터 알림
     Serial.println(button_state_cnt);
     // 블루투스시리얼[하드웨어] 프린터 알림
-    Serial1.println(button_state_cnt);        
+    Serial1.println(button_state_cnt);    
     // LED 깜박임
     blink_fn(button_state_cnt);
   }
@@ -104,7 +133,7 @@ void loop()
     bluetooth_string = Serial1.read();  // 블루투스측 내용 저장
     // 0 => ASCII["48"]
     // Serial.println(bluetooth_string);
-  }  
+  }
 
   // mode setting:
   mode_setting_fn(button_state_cnt);
@@ -135,6 +164,41 @@ void mode_setting_fn(int button_state_cnt)
   else if (button_state_cnt == 3)
   {
 
+  }
+}
+
+
+//-----
+// gyro_getAngle_fn
+int gyro_getAngle_fn()
+{
+  mpu.update();
+  
+  if ((millis() - timer) > 10) // print data every 10ms
+  {
+    // Serial.print("X : ");
+    // Serial.print(mpu.getAngleX());
+    // Serial.print("\tY : ");
+    // Serial.print(mpu.getAngleY());
+    // Serial.print("\tZ : ");
+    // Serial.println(mpu.getAngleZ());
+
+    run_yaw_angle = mpu.getAngleZ();
+
+    timer = millis();  
+  }
+
+  // 목표앵글 도달
+  if (run_yaw_angle == tarket_yaw_angle)
+  {
+    Serial.println("중지");
+
+    F_left_moter_stop_fn();
+    F_right_moter_stop_fn();
+    B_left_moter_stop_fn();
+    B_right_moter_stop_fn();
+
+    tarket_yaw_angle = 9999;
   }
 }
 
@@ -207,7 +271,7 @@ void BLE_rx_tx_fn()
   if (Serial1.available())
   { // Serial1[하드웨어] 값이 있으면
     Serial.write(Serial1.read());       //블루투스측 내용을 시리얼모니터에 출력
-  }
+  }  
 
   // Serial.println("bluetooth_string : " + bluetooth_string);       //시리얼모니터에 bluetooth_string 값 출력
   if (bluetooth_string != "")         //bluetooth_string 값이 있다면
@@ -284,10 +348,77 @@ void BLE_rx_tx_fn()
       B_right_moter_R_fn();      
     }
 
+    // 1 = "49"
+    else if (bluetooth_string == "49")
+    {
+      Serial.println("좌회전");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_R_fn();
+      F_right_moter_F_fn();
+      B_left_moter_stop_fn();
+      B_right_moter_stop_fn();      
+    }
+
+    // 3 = "51"
+    else if (bluetooth_string == "51")
+    {
+      Serial.println("우회전");
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_F_fn();
+      F_right_moter_R_fn();
+      B_left_moter_stop_fn();
+      B_right_moter_stop_fn();      
+    }
+
+    // 7 = "55"
+    else if (bluetooth_string == "55")
+    {
+      Serial.println("좌90");
+
+      //자이로 계산(목표 yaw)
+      tarket_yaw_angle = run_yaw_angle + 90;
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_R_fn();
+      F_right_moter_F_fn();
+      B_left_moter_R_fn();
+      B_right_moter_F_fn();
+
+      // bluetooth_string초기화
+      bluetooth_string = "";               
+    }
+
+    // 9 = "57"
+    else if (bluetooth_string == "57")
+    {
+      Serial.println("우90");
+
+      //자이로 계산(목표 yaw)
+      tarket_yaw_angle = run_yaw_angle - 90;      
+
+      // BUZZER ON/OFF 함수
+      button_state = 0;
+
+      F_left_moter_F_fn();
+      F_right_moter_R_fn();
+      B_left_moter_F_fn();
+      B_right_moter_R_fn();      
+
+      // bluetooth_string초기화
+      bluetooth_string = "";         
+    }                
+
     // BUZZER ON/OFF 함수
     buzzer_fn(button_state);          
-
-  }  
+  }
 
 /*
 "No line ending [9600 baud]"
