@@ -20,6 +20,8 @@ PCB_ver
 
 // 아날로그핀 설계
 #define button_pin A0                 // A0번 아날로그핀(button_pin)             :: 푸쉬스위치 입력
+#define line_sensor_L_pin A1          // A1번 아날로그핀(line_sensor_L_pin)      :: 라인센서 입력
+#define line_sensor_R_pin A2          // A2번 아날로그핀(line_sensor_R_pin)      :: 라인센서 입력
 
 // 버튼상태 변수 선언
 int button_state = 0;
@@ -28,6 +30,10 @@ int led_blink_speed = 50;
 
 // 블루투스 받는 문자열
 String bluetooth_string = "";
+
+// 라인센서 변수선언
+int line_sensor_L, line_sensor_R;
+int line_sensor_limit = 100;
 
 
 //-----
@@ -119,7 +125,8 @@ void mode_setting_fn(int button_state_cnt)
   }
   else if (button_state_cnt == 1)
   {
-
+    // line_sensor_fn:
+    line_sensor_fn();
   }
   else if (button_state_cnt == 2)
   {
@@ -128,6 +135,66 @@ void mode_setting_fn(int button_state_cnt)
   else if (button_state_cnt == 3)
   {
 
+  }
+}
+
+
+//-----
+// line_sensor_fn
+int line_sensor_fn()
+{
+  // Line_Sensor:
+  line_sensor_L = analogRead(line_sensor_L_pin);
+  line_sensor_R = analogRead(line_sensor_R_pin);
+  // print out the value you read:
+  Serial.print("line_sensor_L : ");
+  Serial.println(line_sensor_L);
+  Serial.print("line_sensor_R : ");
+  Serial.println(line_sensor_R);
+  // 블루투스시리얼[하드웨어] 프린터 알림
+  Serial1.print(line_sensor_L);
+  Serial1.print(" / ");
+  Serial1.println(line_sensor_R);  
+
+  // 라인센서 아날로그 신호(백색:~100, 흑색:200~)  :: 평균값임 조도에 따라서 변화 심함
+  if (line_sensor_L < line_sensor_limit && line_sensor_R < line_sensor_limit)
+  {
+    Serial.println("전진");
+
+    F_left_moter_F_fn();
+    F_right_moter_F_fn();
+    B_left_moter_F_fn();
+    B_right_moter_F_fn();
+  }
+
+  else if (line_sensor_L < line_sensor_limit && line_sensor_R > line_sensor_limit)
+  {
+    Serial.println("좌회전");
+
+    F_left_moter_R_fn();
+    F_right_moter_F_fn();
+    B_left_moter_R_fn();
+    B_right_moter_F_fn();
+  }
+
+  else if (line_sensor_L > line_sensor_limit && line_sensor_R < line_sensor_limit)
+  {
+    Serial.println("우회전");
+
+    F_left_moter_F_fn();
+    F_right_moter_R_fn();
+    B_left_moter_F_fn();
+    B_right_moter_R_fn();
+  }
+
+  else if (line_sensor_L > line_sensor_limit && line_sensor_R > line_sensor_limit)
+  {
+    Serial.println("중지");
+
+    F_left_moter_stop_fn();
+    F_right_moter_stop_fn();
+    B_left_moter_stop_fn();
+    B_right_moter_stop_fn();
   }
 }
 
